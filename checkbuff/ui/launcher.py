@@ -285,7 +285,13 @@ class Launcher(QMainWindow):
         self.updater.progress.connect(lambda m: self.update_btn.setText(m))
         self.updater.failed.connect(self._on_update_failed)
         self.updater.ready_to_restart.connect(self._restart_after_update)
-        QTimer.singleShot(1500, self.updater.check_async)
+        self.update_newer = False
+        self.update_manual = False
+        QTimer.singleShot(1500, self._check_updates)
+        # 켜 둔 채로 있어도 새 버전을 알 수 있게 30분마다 다시 확인
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(lambda: None if self.update_newer else self._check_updates())
+        self.update_timer.start(30 * 60 * 1000)
         if restarted:
             QTimer.singleShot(1500, lambda: self.status_lbl.setText("코드 변경을 감지해 자동으로 다시 시작했습니다"))
 
@@ -342,7 +348,7 @@ class Launcher(QMainWindow):
         self.update_btn = QPushButton("업데이트 확인 중…")
         self.update_btn.setObjectName("update")
         self.update_btn.setEnabled(False)
-        self.update_btn.clicked.connect(self._do_update)
+        self.update_btn.clicked.connect(self._on_update_btn)
         head.addWidget(self.update_btn, 0, Qt.AlignVCenter)
         head.addSpacing(12)
         self.pill = QLabel()
@@ -526,30 +532,50 @@ class Launcher(QMainWindow):
             c.update_targets()
 
     # ---------- 업데이트 / 패치노트 ----------
+    def _set_update_btn(self, text, tip, mode):
+        """mode: 'newer' 새 버전 있음(초록) / 'check' 눌러서 다시 확인 / 'busy' 확인·받는 중"""
+        b = self.update_btn
+        b.setObjectName("update" if mode == "newer" else "secondary")
+        b.style().unpolish(b)
+        b.style().polish(b)
+        b.setText(text)
+        b.setToolTip(tip)
+        b.setEnabled(mode != "busy")
+        self.update_newer = mode == "newer"
+
+    def _check_updates(self, manual=False):
+        if self.update_btn.text().startswith("받는 중"):
+            return
+        self.update_manual = manual
+        self._set_update_btn("확인 중…", "", "busy")
+        self.updater.check_async()
+
+    def _on_update_btn(self):
+        if self.update_newer and FROZEN:
+            self._do_update()
+        else:
+            self._check_updates(manual=True)
+
     def _on_update_checked(self, info):
         if info.get("error"):
-            self.update_btn.setText("업데이트 확인 실패")
-            self.update_btn.setToolTip(f"인터넷 연결 또는 GitHub 상태를 확인하세요\n{info['error']}")
-            self.update_btn.setEnabled(False)
+            self._set_update_btn("다시 확인", f"업데이트 확인 실패 · 눌러서 다시 확인\n{info['error']}", "check")
         elif info.get("newer"):
-            self.update_btn.setText(f"업데이트 v{info['latest']}")
-            self.update_btn.setToolTip("눌러서 새 버전을 받고 다시 시작합니다 (설정은 그대로 유지)")
-            self.update_btn.setEnabled(FROZEN)
-            if not FROZEN:
-                self.update_btn.setToolTip("소스로 실행 중이라 자동 업데이트는 exe 에서만 됩니다")
+            tip = ("눌러서 새 버전을 받고 다시 시작합니다 (설정은 그대로 유지)" if FROZEN
+                   else "소스로 실행 중이라 자동 업데이트는 exe 에서만 됩니다")
+            self._set_update_btn(f"업데이트 v{info['latest']}", tip, "newer")
+            self.status_lbl.setText(f"새 버전 v{info['latest']} 이 있습니다 · 오른쪽 위 버튼으로 업데이트")
         else:
-            self.update_btn.setText("최신 버전")
-            self.update_btn.setToolTip(f"현재 v{__version__}")
-            self.update_btn.setEnabled(False)
+            self._set_update_btn("최신 버전 ↻", f"현재 v{__version__} (최신) · 눌러서 다시 확인", "check")
+            if self.update_manual:
+                self.status_lbl.setText(f"이미 최신 버전입니다 (v{__version__})")
+        self.update_manual = False
 
     def _do_update(self):
-        self.update_btn.setEnabled(False)
-        self.update_btn.setText("받는 중…")
+        self._set_update_btn("받는 중…", "", "busy")
         self.updater.apply_async()
 
     def _on_update_failed(self, msg):
-        self.update_btn.setText("업데이트 다시 시도")
-        self.update_btn.setEnabled(True)
+        self._set_update_btn("업데이트 다시 시도", msg, "newer")
         self._on_error(msg)
 
     def _restart_after_update(self):
