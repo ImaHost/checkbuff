@@ -1,4 +1,4 @@
-"""갱신 필요 오버레이 (남은 시간이 기준 이하인 체크 버프만).
+"""버프 갱신 오버레이 (남은 시간이 기준 이하인 체크 버프만).
 
 게임 버프창과 구분되는 작은 카드형: 아이콘 · 이름 · 큰 숫자 · 줄어드는 게이지.
 남은 시간에 따라 주황→빨강, 10초 이하면 깜빡임. 이름을 접으면 아이콘과 시간만 보인다.
@@ -24,8 +24,8 @@ class AlertWindow(QWidget):
     moved = Signal(list)
     collapse_toggled = Signal(bool)
 
-    def __init__(self, cfg: dict, prefix: str = "alert", title: str = "갱신 필요", default_pos=(200, 200)):
-        """prefix: 위치·접기 상태를 저장할 설정 키 앞부분 (갱신 필요 창 'alert', 디버프 창 'debuff_alert')"""
+    def __init__(self, cfg: dict, prefix: str = "alert", title: str = "버프 갱신", default_pos=(200, 200)):
+        """prefix: 위치·접기 상태를 저장할 설정 키 앞부분 (버프 갱신 창 'alert', 디버프 창 'debuff_alert')"""
         super().__init__(None, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.cfg = cfg
         self.prefix = prefix
@@ -152,7 +152,7 @@ class AlertWindow(QWidget):
             p.setBrush(QColor(8, 9, 12, int(120 * opacity)))
             p.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 8 * s, 8 * s)
 
-        # 헤더 알약: "갱신 필요 N"  +  접기/펼치기 단추
+        # 헤더 알약: "버프 갱신 N"  +  접기/펼치기 단추
         hf = self._font(11)
         fm = QFontMetrics(hf)
         ph = self.header_h - 4 * s
