@@ -15,6 +15,8 @@ WS_EX_LAYERED = 0x80000
 WS_EX_TRANSPARENT = 0x20
 WS_EX_NOACTIVATE = 0x08000000
 
+SCALE_MIN, SCALE_MAX = 0.6, 3.0
+GRIP = 16                      # 오른쪽 아래 크기 조절 손잡이
 GOLD = QColor(227, 181, 91)
 TEXT = QColor(245, 242, 235)
 GRAY = QColor(150, 150, 150)
@@ -33,9 +35,11 @@ class AlertWindow(QWidget):
         self.default_pos = default_pos
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setMouseTracking(True)
         self.items = []
         self._drag = None
         self._press_pos = None
+        self._resize = None          # (누른 전역 x, 시작 배율, 시작 폭)
         self.positioning = False     # 위치 조정 중에만 빈 창을 보여 줌
         self._closed = False
         self._toggle_rect = QRectF()
@@ -89,7 +93,12 @@ class AlertWindow(QWidget):
     # ---------- 레이아웃 ----------
     @property
     def _s(self):
-        return float(self.cfg.get("alert_scale", 1.0))
+        """창마다 크기 배율 (위치 조정 모드에서 오른쪽 아래 모서리로 조절). 없으면 공통 '알림창 크기'."""
+        return float(self.cfg.get(self._k("win_scale")) or self.cfg.get("alert_scale", 1.0))
+
+    def set_scale(self, v: float):
+        self.cfg[self._k("win_scale")] = round(max(SCALE_MIN, min(SCALE_MAX, v)), 2)
+        self.refresh_style()
 
     @property
     def collapsed(self):
@@ -151,6 +160,11 @@ class AlertWindow(QWidget):
             p.setPen(QPen(QColor(227, 181, 91, 220), 1.5, Qt.DashLine))
             p.setBrush(QColor(8, 9, 12, int(120 * opacity)))
             p.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 8 * s, 8 * s)
+            # 크기 조절 손잡이 (오른쪽 아래 빗금)
+            p.setPen(QPen(GOLD, 2))
+            w, h = self.width(), self.height()
+            for k in (4, 9, 14):
+                p.drawLine(w - 3, h - 3 - k, w - 3 - k, h - 3)
 
         # 헤더 알약: "버프 갱신 N"  +  접기/펼치기 단추
         hf = self._font(11)
@@ -275,16 +289,34 @@ class AlertWindow(QWidget):
                        Qt.AlignRight | Qt.AlignVCenter, unit)
 
     # ---------- 마우스: 드래그 이동 / 접기 단추 ----------
+    def _in_grip(self, pos) -> bool:
+        return self.positioning and pos.x() >= self.width() - GRIP and pos.y() >= self.height() - GRIP
+
     def mousePressEvent(self, e):
-        if e.button() == Qt.LeftButton and (self.positioning or not self.cfg.get("alert_locked")):
-            self._drag = e.globalPosition().toPoint() - self.pos()
-            self._press_pos = e.position()
+        if e.button() != Qt.LeftButton or not (self.positioning or not self.cfg.get("alert_locked")):
+            return
+        if self._in_grip(e.position()):
+            self._resize = (e.globalPosition().x(), self._s, self.width())
+            return
+        self._drag = e.globalPosition().toPoint() - self.pos()
+        self._press_pos = e.position()
 
     def mouseMoveEvent(self, e):
+        if self._resize is not None:
+            x0, s0, w0 = self._resize
+            # 폭이 늘어난 비율만큼 배율을 키움 → 글자·도형을 그 크기로 새로 그려서 흐려지지 않음
+            self.set_scale(s0 * max(0.2, (w0 + e.globalPosition().x() - x0) / w0))
+            return
         if self._drag is not None:
             self.move(e.globalPosition().toPoint() - self._drag)
+            return
+        self.setCursor(Qt.SizeFDiagCursor if self._in_grip(e.position()) else Qt.ArrowCursor)
 
     def mouseReleaseEvent(self, e):
+        if self._resize is not None:
+            self._resize = None
+            self.moved.emit(self.cfg.get(self._k("pos")) or [self.x(), self.y()])     # 저장 신호
+            return
         if self._drag is None:
             return
         clicked = self._press_pos is not None and (e.position() - self._press_pos).manhattanLength() < 4
@@ -293,5 +325,5 @@ class AlertWindow(QWidget):
             self.set_collapsed(not self.collapsed)
             self.collapse_toggled.emit(self.collapsed)
             return
-        self.cfg["alert_pos"] = [self.x(), self.y()]
-        self.moved.emit(self.cfg["alert_pos"])
+        self.cfg[self._k("pos")] = [self.x(), self.y()]       # 창마다 따로 저장
+        self.moved.emit(self.cfg[self._k("pos")])

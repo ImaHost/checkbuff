@@ -423,8 +423,10 @@ class Launcher(QMainWindow):
         interval.setToolTip("숫자 자동 학습은 1초 미만 간격일 때만 동작합니다.")
         g.addWidget(interval, 0, 3)
         g.addWidget(lbl("알림창 크기"), 1, 0)
-        g.addWidget(spin("alert_scale", 0.8, 2.5, 0.1, " 배", True,
-                         lambda: [w.refresh_style() for w in self._overlays()]), 1, 1)
+        scale_spin = spin("alert_scale", 0.6, 3.0, 0.1, " 배", True, self._apply_common_scale)
+        scale_spin.setToolTip("세 알림창 크기를 한꺼번에 맞춥니다.\n창마다 따로 바꾸려면 '알림창·영역 위치 조정'에서 "
+                              "창 오른쪽 아래 모서리를 드래그하세요")
+        g.addWidget(scale_spin, 1, 1)
         g.addWidget(lbl("알림창 투명도"), 1, 2)
         g.addWidget(spin("alert_opacity", 0.2, 1.0, 0.05, "", True,
                          lambda: [w.update() for w in self._overlays()]), 1, 3)
@@ -479,9 +481,6 @@ class Launcher(QMainWindow):
         names_btn = QPushButton("버프 이름 목록")
         names_btn.setObjectName("ghost")
         names_btn.clicked.connect(self._edit_names)
-        reset_btn = QPushButton("숫자 학습 초기화")
-        reset_btn.setObjectName("ghost")
-        reset_btn.clicked.connect(self._reset_glyphs)
         self.pos_btn = QPushButton("알림창·영역 위치 조정")
         self.pos_btn.setToolTip("알림창을 옮기고, 캡처 영역(버프·디버프)도 화면에서 드래그로 옮기거나 크기를 바꿉니다")
         self.region_frames = []
@@ -489,7 +488,6 @@ class Launcher(QMainWindow):
         self.pos_btn.clicked.connect(self._toggle_positioning)
         more.addWidget(self.pos_btn)
         more.addWidget(names_btn)
-        more.addWidget(reset_btn)
         more.addStretch()
         lay.addLayout(more)
         left.addWidget(c, 2)
@@ -780,6 +778,11 @@ class Launcher(QMainWindow):
             row.addWidget(b)
         row.addStretch()
         return row
+
+    def _apply_common_scale(self):
+        for w in self._overlays():
+            self.cfg.pop(w._k("win_scale"), None)          # 창별 크기를 지우고 공통 크기로
+            w.refresh_style()
 
     def _overlays(self):
         return [self.alert, self.debuff_alert, self.presence_alert]
@@ -1078,13 +1081,6 @@ class Launcher(QMainWindow):
         if d.exec():
             self.cfg["known_names"] = d.names()
             self._save()
-
-    def _reset_glyphs(self):
-        if QMessageBox.question(self, "숫자 학습 초기화",
-                                "학습한 숫자 모양을 모두 지웁니다. UI 크기/해상도를 바꿨을 때 사용하세요.") \
-                == QMessageBox.Yes:
-            self.book.reset()
-            self.book.save()
 
     def _update_region_label(self):
         r = self.cfg.get("region")
