@@ -1,4 +1,4 @@
-"""버프체크기 실행 진입점."""
+"""멜야옹 체크기 실행 진입점."""
 import ctypes
 import os
 import sys

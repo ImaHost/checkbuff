@@ -22,9 +22,9 @@ from .version import __version__
 
 REPO = "ImaHost/checkbuff"
 API = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
-ASSET_NAME = "BuffChecker.exe"
+ASSET_NAME = "MelyaongChecker.exe"
 NOTES_CACHE = APP_DIR / "release_notes.json"
-UA = {"User-Agent": "BuffChecker-updater", "Accept": "application/vnd.github+json"}
+UA = {"User-Agent": "MelyaongChecker-updater", "Accept": "application/vnd.github+json"}
 
 
 def vtuple(v: str) -> tuple:

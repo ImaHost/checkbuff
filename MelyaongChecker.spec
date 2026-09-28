@@ -1,4 +1,4 @@
-# PyInstaller 빌드 설정:  py -m PyInstaller BuffChecker.spec  →  dist/BuffChecker.exe
+# PyInstaller 빌드 설정:  py -m PyInstaller MelyaongChecker.spec  →  dist/MelyaongChecker.exe
 # 한 파일짜리 exe (다른 사람에게 이 파일 하나만 주면 됨). 설정은 각자 %APPDATA%\CheckBuff 에 저장.
 from PyInstaller.utils.hooks import collect_submodules
 
@@ -20,7 +20,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="BuffChecker",
+    name="MelyaongChecker",
     icon="assets/icon.ico",
     console=False,
     upx=False,

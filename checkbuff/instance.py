@@ -4,8 +4,8 @@ import os
 import sys
 import time
 
-APP_NAME = "버프체크기"
-WINDOW_TITLE = "버프체크기"
+APP_NAME = "멜야옹 체크기"
+WINDOW_TITLE = "멜야옹 체크기"
 APP_ID = "BuffChecker.Mabinogi.1"
 # CHECKBUFF_INSTANCE: 테스트할 때 실행 중인 프로그램과 따로 띄우기 위한 것 (평소엔 비어 있음)
 _MUTEX_NAME = "Local\\CheckBuff.SingleInstance" + os.environ.get("CHECKBUFF_INSTANCE", "")

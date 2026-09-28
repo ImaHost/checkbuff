@@ -1,7 +1,7 @@
-# 버프체크기 — 마비노기 버프 남은 시간 알림
+# 멜야옹 체크기 — 마비노기 버프·디버프 알림
 
 ## 실행 / 배포
-- **사용자**: GitHub 릴리스(https://github.com/ImaHost/checkbuff/releases)의 `BuffChecker.exe` 하나만 받아 실행하면 됩니다.
+- **사용자**: GitHub 릴리스(https://github.com/ImaHost/checkbuff/releases)의 `MelyaongChecker.exe` 하나만 받아 실행하면 됩니다.
   - 실행하면 새 버전이 있는지 확인하고, 있으면 오른쪽 위 **업데이트** 버튼이 켜집니다 (누르면 받아서 다시 시작).
   - **패치노트** 버튼으로 버전별 변경 내용을 볼 수 있습니다.
   - 설정·학습 데이터는 각자 PC 의 `%APPDATA%\CheckBuff\` 에 저장되어 업데이트해도 유지됩니다.
@@ -9,7 +9,7 @@
 - **개발**: `run.bat` 또는 `py -3 main.py` (소스로 실행하면 코드가 바뀔 때 자동으로 다시 시작).
   - `main` 브랜치에 push 하면 GitHub Actions 가 exe 를 빌드해 릴리스 `v1.0.N` 을 만듭니다 (커밋 메시지가 패치노트).
     릴리스가 필요 없는 커밋은 메시지에 `[skip ci]`.
-  - 로컬 빌드: `py -m PyInstaller BuffChecker.spec` → `dist/BuffChecker.exe`
+  - 로컬 빌드: `py -m PyInstaller MelyaongChecker.spec` → `dist/MelyaongChecker.exe`
 
 ## 사용법
 1. **F10** (게임 중에도 동작, 설정에서 F1~F12 로 변경 가능) → 화면이 멈추면 버프 목록(아이콘 + 이름 + 남은 시간)을 드래그로 선택합니다.

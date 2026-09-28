@@ -44,12 +44,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
-          pyinstaller BuffChecker.spec --noconfirm
+          pyinstaller MelyaongChecker.spec --noconfirm
 
       - name: 릴리스 올리기
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ steps.ver.outputs.version }}" dist/BuffChecker.exe \
+          gh release create "v${{ steps.ver.outputs.version }}" dist/MelyaongChecker.exe \
             --title "v${{ steps.ver.outputs.version }}" --notes-file notes.md --target "${{ github.sha }}"
