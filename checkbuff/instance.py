@@ -52,7 +52,7 @@ def set_taskbar_identity():
 
 def relaunch_args() -> list[str]:
     """재시작용 인자: 이미 관리자면 UAC 를 다시 묻지 않도록 --no-admin."""
-    args = [a for a in sys.argv[1:] if a not in ("--no-admin", "--restarted")]
+    args = [a for a in sys.argv[1:] if a not in ("--no-admin", "--restarted", "--register-task", "--from-task")]
     if getattr(sys, "frozen", False) and args and args[0].lower().endswith(".py"):
         args = args[1:]
     return [*args, "--no-admin", "--restarted"]

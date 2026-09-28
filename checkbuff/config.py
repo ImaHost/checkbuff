@@ -20,6 +20,7 @@ DEFAULT_KNOWN_NAMES = [
 DEFAULTS = {
     "region": None,              # [x, y, w, h] 물리 픽셀 좌표
     "hotkey": "F10",
+    "admin_task": True,          # UAC 창 없이 관리자로 실행 (작업 스케줄러)
     "interval_ms": 500,          # 체크 주기
     "threshold_sec": 30,         # 이 시간 이하면 알림창에 표시
     "expired_keep_sec": 8,       # 만료된 버프를 알림창에 남겨둘 시간

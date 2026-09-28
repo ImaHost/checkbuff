@@ -5,24 +5,9 @@ import sys
 
 
 def ensure_admin():
-    """마비노기는 관리자 권한으로 돌아가므로, 그 위에서 단축키를 받으려면 이쪽도 관리자여야 한다.
-    UAC 창에서 '아니요'를 누르면 일반 권한으로 그냥 실행한다."""
-    if os.environ.get("CHECKBUFF_NO_ADMIN") or "--no-admin" in sys.argv:
-        return
-    try:
-        if ctypes.windll.shell32.IsUserAnAdmin():
-            return
-        if getattr(sys, "frozen", False):            # exe: 자기 자신을 다시 실행
-            argv, cwd = [*sys.argv[1:], "--no-admin"], os.path.dirname(sys.executable)
-        else:                                        # 소스: python main.py
-            script = os.path.abspath(sys.argv[0])
-            argv, cwd = [script, *sys.argv[1:], "--no-admin"], os.path.dirname(script)
-        args = " ".join(f'"{a}"' for a in argv)
-        rc = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, args, cwd, 1)
-        if rc > 32:
-            sys.exit(0)
-    except Exception:
-        pass
+    """관리자 권한으로 실행 (UAC 창은 처음 한 번만, 이후엔 작업 스케줄러로). checkbuff/elevate.py 참고."""
+    from checkbuff import config, elevate
+    elevate.ensure_admin(auto_task=config.load().get("admin_task", True))
 
 
 ensure_admin()

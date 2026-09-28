@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QCompleter, Q
                                QScrollArea, QSpinBox, QVBoxLayout,
                                QWidget)
 
-from .. import config, instance, sound
+from .. import config, elevate, instance, sound
 from ..glyphs import GlyphBook
 from ..hotkey import VK, GlobalHotkey
 from ..reloader import CodeWatcher
@@ -461,10 +461,19 @@ class Launcher(QMainWindow):
         self.reload_chk.setToolTip("프로그램 파일이 바뀌면 설정·위치를 유지한 채 알아서 다시 시작합니다.")
         self.reload_chk.toggled.connect(lambda v: (self.cfg.__setitem__("auto_reload", v), self._save()))
         checks.addWidget(self.reload_chk)
+        self.admin_chk = QCheckBox("UAC 창 없이 실행")
+        self.admin_chk.setToolTip("켜면 처음 한 번만 관리자 권한을 묻고, 다음부터는 묻지 않고 관리자로 실행합니다\n"
+                                  "(Windows 작업 스케줄러에 이 프로그램 전용 작업을 등록)")
+        self.admin_chk.setChecked(self.cfg.get("admin_task", True))
+        self.admin_chk.toggled.connect(self._toggle_admin_task)
         self.reload_chk.setVisible(not FROZEN)
         checks.addStretch()
         lay.addLayout(checks)
         lay.addLayout(buff_snd)
+        adm = QHBoxLayout()
+        adm.addWidget(self.admin_chk)
+        adm.addStretch()
+        lay.addLayout(adm)
 
         more = QHBoxLayout()
         names_btn = QPushButton("버프 이름 목록")
@@ -585,6 +594,19 @@ class Launcher(QMainWindow):
     def _show_notes(self):
         info = self.updater.info or {}
         NotesDialog(info.get("notes") or cached_notes(), self).exec()
+
+    def _toggle_admin_task(self, v):
+        self.cfg["admin_task"] = v
+        self._save()
+        if not elevate.is_admin():
+            self.status_lbl.setText("관리자 권한으로 실행 중이 아니라 다음 실행 때 적용됩니다")
+            return
+        if v:
+            ok = elevate.register_task()
+            self.status_lbl.setText("다음부터 UAC 창 없이 실행합니다" if ok else "작업 등록에 실패했습니다")
+        else:
+            elevate.remove_task()
+            self.status_lbl.setText("다음부터 실행할 때마다 관리자 권한을 묻습니다")
 
     def _set_collapsed(self, v):
         self.alert.set_collapsed(v)
@@ -1191,6 +1213,7 @@ class Launcher(QMainWindow):
         super().closeEvent(e)
         if self.restarting:
             instance.release()
+            elevate.reset_env_for_child()     # 새 exe 가 이전 exe 의 임시 폴더를 이어 쓰지 않도록
             if FROZEN:
                 QProcess.startDetached(sys.executable, instance.relaunch_args(), str(APP_EXE.parent))
             else:
