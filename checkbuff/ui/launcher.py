@@ -1,4 +1,5 @@
 """메인 실행기 창."""
+import os
 import sys
 import time
 from pathlib import Path
@@ -564,17 +565,22 @@ class Launcher(QMainWindow):
             self._check_updates(manual=True)
 
     def _on_update_checked(self, info):
+        stamp = time.strftime("%H:%M:%S")
         if info.get("error"):
             self._set_update_btn("다시 확인", f"업데이트 확인 실패 · 눌러서 다시 확인\n{info['error']}", "check")
+            # 눌렀는데 또 실패하면 반응이 없는 것처럼 보이므로 이유와 시각을 상태 줄에 표시
+            self.status_lbl.setText(f"{stamp} 업데이트 확인 실패 (인터넷 연결 확인) · {info['error'][:80]}")
         elif info.get("newer"):
             tip = ("눌러서 새 버전을 받고 다시 시작합니다 (설정은 그대로 유지)" if FROZEN
                    else "소스로 실행 중이라 자동 업데이트는 exe 에서만 됩니다")
             self._set_update_btn(f"업데이트 v{info['latest']}", tip, "newer")
             self.status_lbl.setText(f"새 버전 v{info['latest']} 이 있습니다 · 오른쪽 위 버튼으로 업데이트")
+            if FROZEN and os.environ.get("CHECKBUFF_TEST_AUTOUPDATE"):   # 자동 테스트 전용: 바로 업데이트
+                QTimer.singleShot(500, self._do_update)
         else:
             self._set_update_btn("최신 버전 ↻", f"현재 v{__version__} (최신) · 눌러서 다시 확인", "check")
             if self.update_manual:
-                self.status_lbl.setText(f"이미 최신 버전입니다 (v{__version__})")
+                self.status_lbl.setText(f"{stamp} 확인 완료 · 이미 최신 버전입니다 (v{__version__})")
         self.update_manual = False
 
     def _do_update(self):
