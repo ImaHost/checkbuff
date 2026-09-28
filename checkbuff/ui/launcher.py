@@ -24,6 +24,7 @@ from .alert import AlertWindow
 from .keycapture import KeyCaptureButton
 from .debuff_dialog import DebuffRegisterDialog
 from .picker import BuffPickDialog
+from .region_frame import RegionFrame
 from .summon_card import SummonCard
 from .selector import RegionSelector
 
@@ -466,7 +467,9 @@ class Launcher(QMainWindow):
         reset_btn = QPushButton("숫자 학습 초기화")
         reset_btn.setObjectName("ghost")
         reset_btn.clicked.connect(self._reset_glyphs)
-        self.pos_btn = QPushButton("알림창 위치 조정")
+        self.pos_btn = QPushButton("알림창·영역 위치 조정")
+        self.pos_btn.setToolTip("알림창을 옮기고, 캡처 영역(버프·디버프)도 화면에서 드래그로 옮기거나 크기를 바꿉니다")
+        self.region_frames = []
         self.pos_btn.setObjectName("ghost")
         self.pos_btn.clicked.connect(self._toggle_positioning)
         more.addWidget(self.pos_btn)
@@ -639,8 +642,7 @@ class Launcher(QMainWindow):
                     w.setParent(None)
                     w.deleteLater()
         self.debuff_status = {}
-        r = self.cfg.get("debuff_region")
-        self.debuff_region_lbl.setText(f"영역: x {r[0]}, y {r[1]}  ·  {r[2]} × {r[3]} px" if r else "영역이 지정되지 않았습니다")
+        self._update_debuff_region_label()
         if not self.debuff_book.items:
             empty = QLabel("등록한 디버프가 없습니다")
             empty.setObjectName("muted")
@@ -684,6 +686,10 @@ class Launcher(QMainWindow):
             rm.clicked.connect(lambda _=False, did=it["id"]: self._remove_debuff(did))
             row.addWidget(rm)
             self.debuff_list.addLayout(row)
+
+    def _update_debuff_region_label(self):
+        r = self.cfg.get("debuff_region")
+        self.debuff_region_lbl.setText(f"영역: x {r[0]}, y {r[1]}  ·  {r[2]} × {r[3]} px" if r else "영역이 지정되지 않았습니다")
 
     def _debuffs_changed(self):
         self.debuff_book.save()
@@ -928,13 +934,37 @@ class Launcher(QMainWindow):
         self._save()
 
     def _toggle_positioning(self):
+        """알림창 위치 + 캡처 영역(버프·디버프)을 화면에서 함께 조정."""
         on = not self.alert.positioning
         for w in self._overlays():
             w.set_positioning(on)
             w.set_items(w.items)
-        self.pos_btn.setText("위치 조정 완료" if on else "알림창 위치 조정")
-        if not on:
+        if on:
+            for key, label, color in (("region", "버프 영역", style.ACCENT), ("debuff_region", "디버프 영역", "#6fb7ff")):
+                r = self.cfg.get(key)
+                if r:
+                    f = RegionFrame(r, label, color)
+                    f.changed.connect(lambda reg, k=key: self._on_frame_changed(k, reg))
+                    f.show()
+                    self.region_frames.append(f)
+        else:
+            self._close_region_frames()
             self._save()
+        self.pos_btn.setText("위치 조정 완료" if on else "알림창·영역 위치 조정")
+
+    def _close_region_frames(self):
+        for f in self.region_frames:
+            f.close()
+        self.region_frames = []
+
+    def _on_frame_changed(self, key, reg):
+        """영역 틀을 놓을 때마다 바로 저장 → 감시도 새 영역으로 (버프 영역이면 이름 열 위치를 다시 찾음)."""
+        self.cfg[key] = reg
+        if key == "region":
+            self._update_region_label()
+        else:
+            self._update_debuff_region_label()
+        self._save()
 
     def _update_pick_label(self, new_count=0):
         if self.pick_btn.isEnabled():
@@ -1120,6 +1150,7 @@ class Launcher(QMainWindow):
         self.ui_timer.stop()
         if self.watcher:
             self.watcher.timer.stop()
+        self._close_region_frames()
         self.alert.shutdown()
         self.debuff_alert.shutdown()
         self.presence_alert.shutdown()
