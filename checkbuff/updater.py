@@ -21,7 +21,8 @@ from .paths import FROZEN, RES_DIR
 from .version import __version__
 
 REPO = "ImaHost/checkbuff"
-API = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
+API = f"https://api.github.com/repos/{REPO}/releases?per_page=30"       # 패치노트용 (한도 있음)
+LATEST = f"https://github.com/{REPO}/releases/latest"                     # 버전 확인용 (한도 없음)
 ASSET_NAME = "MelyaongChecker.exe"
 NOTES_CACHE = APP_DIR / "release_notes.json"
 UA = {"User-Agent": "MelyaongChecker-updater", "Accept": "application/vnd.github+json"}
@@ -72,30 +73,39 @@ class Updater(QObject):
         threading.Thread(target=self._check, daemon=True).start()
 
     def _check(self):
+        """최신 버전은 GitHub 웹의 '최신 릴리스' 주소가 넘겨 주는 곳(…/releases/tag/v1.0.N)으로 알아낸다.
+        조회 API 는 IP 당 시간당 60회 한도가 있어(PC방처럼 여럿이 같은 인터넷을 쓰면 금방 바닥남)
+        버전 확인에는 쓰지 않고, 패치노트 내용을 받을 때만 쓴다(실패하면 저장해 둔 내용)."""
+        try:
+            req = urllib.request.Request(LATEST, method="HEAD", headers={"User-Agent": UA["User-Agent"]})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                final = r.geturl()
+            m = re.search(r"/releases/tag/v?([\d.]+)", final)
+            if not m:
+                raise OSError("최신 릴리스를 찾지 못했습니다")
+            lv = m.group(1)
+            url = f"https://github.com/{REPO}/releases/download/v{lv}/{ASSET_NAME}"
+            self.info = {"latest": lv, "newer": vtuple(lv) > vtuple(__version__), "asset_url": url,
+                         "notes": self._fetch_notes() or cached_notes()}
+        except Exception as e:
+            self.info = {"error": str(e), "notes": cached_notes()}
+        self.checked.emit(self.info)
+
+    @staticmethod
+    def _fetch_notes() -> list[dict]:
+        """패치노트 (API). 한도 초과 등으로 실패하면 빈 목록 → 호출 쪽에서 저장해 둔 내용 사용."""
         try:
             req = urllib.request.Request(API, headers=UA)
             with urllib.request.urlopen(req, timeout=10) as r:
                 releases = json.loads(r.read().decode("utf-8"))
-            rels = [x for x in releases if not x.get("draft") and not x.get("prerelease")]
             notes = [{"version": x["tag_name"].lstrip("v"), "date": (x.get("published_at") or "")[:10],
-                      "body": x.get("body") or ""} for x in rels]
-            try:
-                APP_DIR.mkdir(parents=True, exist_ok=True)
-                with open(NOTES_CACHE, "w", encoding="utf-8") as f:
-                    json.dump(notes, f, ensure_ascii=False)
-            except OSError:
-                pass
-            latest = rels[0] if rels else None
-            url = None
-            if latest:
-                url = next((a["browser_download_url"] for a in latest.get("assets", [])
-                            if a["name"].lower().endswith(".exe")), None)
-            lv = latest["tag_name"].lstrip("v") if latest else None
-            self.info = {"latest": lv, "newer": bool(lv and vtuple(lv) > vtuple(__version__) and url),
-                         "asset_url": url, "notes": notes}
-        except Exception as e:
-            self.info = {"error": str(e), "notes": cached_notes()}
-        self.checked.emit(self.info)
+                      "body": x.get("body") or ""} for x in releases if not x.get("draft") and not x.get("prerelease")]
+            APP_DIR.mkdir(parents=True, exist_ok=True)
+            with open(NOTES_CACHE, "w", encoding="utf-8") as f:
+                json.dump(notes, f, ensure_ascii=False)
+            return notes
+        except Exception:
+            return []
 
     # ---------- 적용 ----------
     def apply_async(self):
