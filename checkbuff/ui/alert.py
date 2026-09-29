@@ -52,6 +52,11 @@ class AlertWindow(QWidget):
         """items: [{name, remaining, expired, pixmap}] — 남은 시간 적은 순"""
         if self._closed:
             return
+        now = time.monotonic()
+        if items:
+            self._last_items_at = now     # '실제로' 목록이 들어온 시각만 기록
+        elif self.items and not self.positioning and now - getattr(self, "_last_items_at", 0.0) < self.HIDE_DELAY:
+            items = self.items            # 잠깐 비었을 뿐일 수 있음 → 직전 목록을 잠시 유지
         self.items = items
         self._relayout()
         self._sync_visibility()
@@ -133,6 +138,8 @@ class AlertWindow(QWidget):
         self.card_w = max(self.card_w, int(96 * s))
         self.setFixedSize(self.pad * 2 + self.card_w,
                           self.pad * 2 + self.header_h + len(rows) * (self.card_h + self.gap))
+
+    HIDE_DELAY = 1.5          # 목록이 이 시간 넘게 비어 있어야 숨김
 
     def _sync_visibility(self):
         want = not self._closed and (bool(self.items) or self.positioning)

@@ -39,6 +39,31 @@ class NameBook:
             d = _mismatch(b, bits)
             if d < best_d:
                 best, best_d = name, d
+        return best or self._lookup_noisy(bits)
+
+    def _lookup_noisy(self, bits: np.ndarray) -> str | None:
+        """배경 잡음 점이 이름 둘레에 붙어 비트맵 크기가 달라진 경우.
+        등록된 이름 크기의 창을 몇 픽셀씩 옮겨 가며 비교하고, 창 바깥 픽셀이 아주 적으면(잡음) 같은 이름으로 본다.
+        바깥 픽셀이 많으면 '(투안의노래)' 같은 붙은 글자이므로 여기선 인정하지 않는다 (lookup_prefix 가 처리)."""
+        H, W = bits.shape
+        total = int(bits.sum())
+        best, best_key = None, None
+        for b, name in self.entries:
+            h, w = b.shape
+            if h > H or w > W or W - w > 40 or H - h > 8:
+                continue
+            nb = int(b.sum())
+            for dy in range(0, H - h + 1):
+                for dx in range(0, min(4, W - w) + 1):
+                    win = bits[dy:dy + h, dx:dx + w]
+                    if _mismatch(b, win) >= 0.08:
+                        continue
+                    outside = total - int(win.sum())
+                    if outside > max(3, 0.06 * nb):
+                        continue
+                    key = (w, -_mismatch(b, win))           # 넓은(긴) 이름 우선
+                    if best_key is None or key > best_key:
+                        best, best_key = name, key
         return best
 
     def lookup_prefix(self, bits: np.ndarray | None):

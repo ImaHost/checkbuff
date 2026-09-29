@@ -72,16 +72,21 @@ DEFAULTS = {
     "ham_buffs": ["햄 아드레날린", "햄 버닝"],
     "auto_ham": {},
     # --- 색상 판정 (고급) ---
-    "white_min": 225,            # 흰 글자: RGB 모두 이 값 이상
-    "white_spread": 45,          # 흰 글자: 채널 간 차이 최대값
+    "white_min": 248,            # 흰 글자: RGB 모두 이 값 이상 (게임 글자는 정확히 255)
+    "white_spread": 6,           # 흰 글자: 채널 간 차이 최대값
     "gray_level": 127,           # 사용 중이 아닌 버프 이름 색 (회색)
-    "gray_tol": 8,
-    "red_r_min": 180,            # 빨간 글자: R 최소
-    "red_gb_max": 110,           # 빨간 글자: G, B 최대
-    "red_diff_min": 90,          # 빨간 글자: R - max(G,B) 최소
+    "gray_tol": 2,               # 회색 글자는 정확히 127 → ±2 (넓히면 회색 배경이 글자로 잡힘)
+    "red_r_min": 240,            # 빨간 글자: R 최소 (게임 글자는 정확히 255,0,0)
+    "red_gb_max": 20,            # 빨간 글자: G, B 최대
+    "red_diff_min": 220,         # 빨간 글자: R - max(G,B) 최소
     "outline_check": True,       # 글자 주변 검은 외곽선이 있는 픽셀만 글자로 인정
-    "outline_lum": 90,           # 외곽선으로 인정할 최대 밝기
+    "outline_lum": 70,           # 외곽선으로 인정할 최대 밝기
 }
+
+
+VISION_VERSION = 2
+VISION_KEYS = ("white_min", "white_spread", "gray_level", "gray_tol", "red_r_min", "red_gb_max", "red_diff_min",
+               "outline_lum")
 
 
 def load() -> dict:
@@ -94,6 +99,11 @@ def load() -> dict:
     if cfg.get("hotkey") == "F9" and not cfg.get("hotkey_migrated"):
         cfg["hotkey"] = "F10"            # F9 는 윈도우 캡처 도구와 겹침
     cfg["hotkey_migrated"] = True
+    # 인식 기준을 바꾼 버전: 예전 설정 파일에 저장된 색 기준을 새 기본값으로 교체
+    if cfg.get("vision_version", 0) < VISION_VERSION:
+        for k in VISION_KEYS:
+            cfg[k] = DEFAULTS[k]
+        cfg["vision_version"] = VISION_VERSION
     return cfg
 
 

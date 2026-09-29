@@ -181,16 +181,29 @@ class MonitorWorker(QThread):
             return f"{base_name(base)}{TUAN_SUFFIX}"
         return None
 
-    def _do_scan(self, analyzer, rgb, region):
-        """버프 선택 창용 목록: 회색(대기) 버프까지 이름과 아이콘만."""
+    def _do_scan(self, analyzer, rgb, region, sct=None):
+        """버프 선택 창용 목록: 회색(대기) 버프까지 이름과 아이콘만.
+        배경이 움직이면 한 장에선 못 찾는 줄이 있을 수 있어 몇 장을 캡처해 줄 위치(y)별로 합친다.
+        같은 줄은 등록된 이름으로 알아본 것 → 글자 픽셀이 많은 것 순으로 고른다."""
         col = self._find_col(analyzer, rgb, region) or self._col
-        rows = analyzer.scan(rgb, col) if col is not None else []
-        out = []
-        for r in rows:
-            known = self.identify(analyzer, r.name_bits)
-            out.append({"name": known or r.ocr_name, "ocr": r.ocr_name, "known": bool(known),
-                        "bits": r.name_bits, "icon": r.icon, "active": r.active})
-        self.scanned.emit(out)
+        if col is None:
+            self.scanned.emit([])
+            return
+        frames = [rgb]
+        for _ in range(2 if sct is not None else 0):
+            self.msleep(250)
+            frames.append(self._grab(sct, region))
+        best = {}                                   # 줄 y -> (점수, 항목)
+        for f in frames:
+            for r in analyzer.scan(f, col):
+                known = self.identify(analyzer, r.name_bits)
+                item = {"name": known or r.ocr_name, "ocr": r.ocr_name, "known": bool(known),
+                        "bits": r.name_bits, "icon": r.icon, "active": r.active}
+                key = next((k for k in best if abs(k - r.band[0]) <= 4), r.band[0])
+                score = (bool(known), int(r.name_bits.sum()))
+                if key not in best or score > best[key][0]:
+                    best[key] = (score, item)
+        self.scanned.emit([best[k][1] for k in sorted(best)])
 
     def _tick(self, sct, analyzer: Analyzer, region):
         while self._renames:
@@ -210,7 +223,7 @@ class MonitorWorker(QThread):
         t_start = time.monotonic()
         if self._scan:
             self._scan = False
-            self._do_scan(analyzer, rgb, region)
+            self._do_scan(analyzer, rgb, region, sct)
             if self._paused:
                 return
         col = self._col if self._col is not None else self._find_col(analyzer, rgb, region)

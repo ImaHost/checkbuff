@@ -27,6 +27,9 @@ def reset_env_for_child():
     """자기 자신을 다시 켜기 전에 호출 (새 프로세스가 독립된 임시 폴더를 쓰도록)."""
     if FROZEN:
         os.environ["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+        # 이전 프로세스의 임시 폴더를 가리키는 값도 지워서, 어떤 경로로 켜도 빌려 쓰지 않게
+        for k in [k for k in os.environ if k.startswith("_PYI_") or k.startswith("_MEIPASS")]:
+            del os.environ[k]
 
 
 def is_admin() -> bool:

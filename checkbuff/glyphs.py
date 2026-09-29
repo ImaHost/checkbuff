@@ -84,12 +84,17 @@ class GlyphBook:
             return
         self._dirty = False
         labels = {}
-        # 한글 단위(분/초/시간): OCR 이 잘 읽으므로 다수결
+        # 한글 단위(분/초/시간/일): 다수결. OCR 은 '분'을 '브·부·널' 등으로 제각각 읽으므로
+        # 초·시·간·일이 아닌 한글은 모두 '분'으로 모아서 센다
         for k, v in self.votes.items():
+            units = Counter()
+            for c, n in v.items():
+                if not c.isdigit():
+                    units[c if c in "초시간일" else "분"] += n
             total = sum(v.values())
-            if total >= 2:
-                c, n = v.most_common(1)[0]
-                if not c.isdigit() and n / total >= 0.6:
+            if units and total >= 2:
+                c, n = units.most_common(1)[0]
+                if n / total >= 0.6:
                     labels[k] = c
         labels.update(self._solve_digits())
         self.labels = labels
