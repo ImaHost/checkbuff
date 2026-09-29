@@ -97,7 +97,7 @@ class DebuffRegisterDialog(QDialog):
             grid.addWidget(tile, i // 2, i % 2)
             self.rows.append((icon, ed, chk))
         if not scan["icons"]:
-            empty = QLabel("아이콘을 찾지 못했습니다.\n대상을 선택해 디버프가 보이는 상태에서, 아이콘 줄이 들어가도록 F11 로 다시 지정해 보세요.")
+            empty = QLabel("아이콘을 찾지 못했습니다.\n대상을 선택해 디버프가 보이는 상태에서, 아이콘 줄이 들어가도록 '영역 지정'으로 다시 지정해 보세요.")
             empty.setObjectName("muted")
             empty.setAlignment(Qt.AlignCenter)
             grid.addWidget(empty, 0, 0)

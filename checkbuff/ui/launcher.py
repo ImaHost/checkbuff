@@ -35,6 +35,15 @@ from ..version import __version__
 from .notes_dialog import NotesDialog
 
 ROOT = Path(__file__).resolve().parents[2]
+NO_KEY = "사용 안 함"
+
+
+def _apply_hotkey(hk, key):
+    """단축키 바꾸기: None 이면 끔 (등록된 키는 게임에 전달되지 않으므로 필요할 때만)."""
+    hk.stop()
+    if key:
+        hk.key = key
+        hk.start()
 ICON_PATH = asset("icon.ico")
 
 
@@ -249,10 +258,10 @@ class Launcher(QMainWindow):
         self.presence_alert.collapse_toggled.connect(lambda _: self._save())
         self.presence_alerted = set()
         self.summoners = [AutoSummon(self.cfg, g) for g in GROUPS]      # 자동 투안, 자동 햄
-        self.hotkey = GlobalHotkey(self.cfg.get("hotkey", "F10"))
+        self.hotkey = GlobalHotkey(self.cfg.get("hotkey") or "F10")
         self.hotkey.pressed.connect(self.select_region)
         self.hotkey.failed.connect(self._on_error)
-        self.debuff_hotkey = GlobalHotkey(self.cfg.get("debuff_hotkey", "F11"))
+        self.debuff_hotkey = GlobalHotkey(self.cfg.get("debuff_hotkey") or "F11")
         self.debuff_hotkey.pressed.connect(self.select_debuff_region)
         self.selector = None
         self.snapshot = None
@@ -301,8 +310,11 @@ class Launcher(QMainWindow):
         self.ui_timer.start(200)
 
         self.worker.start()
-        self.hotkey.start()
-        self.debuff_hotkey.start()
+        # 단축키는 설정했을 때만 (기본 '사용 안 함': 등록하면 그 키가 게임에 전달되지 않음)
+        if self.cfg.get("hotkey"):
+            self.hotkey.start()
+        if self.cfg.get("debuff_hotkey"):
+            self.debuff_hotkey.start()
         self.alert.set_locked(bool(self.cfg.get("alert_locked")))
         self.debuff_alert.set_locked(bool(self.cfg.get("alert_locked")))
         self.presence_alert.set_locked(bool(self.cfg.get("alert_locked")))
@@ -368,7 +380,7 @@ class Launcher(QMainWindow):
         body.addLayout(left, 5)
 
         c, lay = card("감시 영역")
-        self.preview = QLabel(f"{self.cfg['hotkey']} 를 눌러 게임 화면의 버프 목록을 드래그하세요")
+        self.preview = QLabel("'영역 지정'을 눌러 게임 화면의 버프 목록을 드래그하세요")
         self.preview.setObjectName("preview")
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setMinimumHeight(200)
@@ -436,7 +448,10 @@ class Launcher(QMainWindow):
         g.addWidget(lbl("영역 지정 키"), 2, 2)
         self.key_combo = QComboBox()
         self.key_combo.addItems(list(VK))
-        self.key_combo.setCurrentText(self.cfg["hotkey"])
+        self.key_combo.clear()
+        self.key_combo.addItems([NO_KEY, *VK])
+        self.key_combo.setCurrentText(self.cfg.get("hotkey") or NO_KEY)
+        self.key_combo.setToolTip("단축키로도 영역 지정을 하려면 고르세요.\n주의: 고른 키는 게임에 전달되지 않습니다 (스킬 키와 겹치지 않게)")
         self.key_combo.currentTextChanged.connect(self._change_hotkey)
         g.addWidget(self.key_combo, 2, 3)
         self.collapse_chk = QCheckBox("알림창 이름 접기 (아이콘+시간만)")
@@ -625,14 +640,14 @@ class Launcher(QMainWindow):
     # ---------- 디버프 ----------
     def _build_debuff_card(self):
         c, lay = card("디버프")
-        tip = QLabel(f"{self.cfg.get('debuff_hotkey', 'F11')} 로 대상(보스)의 디버프 아이콘 줄과 그 아래 체력바까지 "
+        tip = QLabel("'영역 지정'으로 대상(보스)의 디버프 아이콘 줄과 그 아래 체력바까지 "
                      "영역을 지정하세요. 체력바가 보일 때(보스를 선택했을 때)만, 체크한 디버프가 없거나 "
                      "아래 시간이 30초 이하(숫자만 표시)면 '디버프 갱신' 창에 알려 드려요.")
         tip.setObjectName("muted")
         tip.setWordWrap(True)
         lay.addWidget(tip)
         btns = QHBoxLayout()
-        reg = QPushButton(f"영역 지정  ({self.cfg.get('debuff_hotkey', 'F11')})")
+        reg = QPushButton("영역 지정" + (f"  ({self.cfg['debuff_hotkey']})" if self.cfg.get("debuff_hotkey") else ""))
         reg.setObjectName("primary")
         reg.clicked.connect(self.select_debuff_region)
         self.debuff_scan_btn = QPushButton("아이콘 등록")
@@ -664,7 +679,10 @@ class Launcher(QMainWindow):
         opts.addWidget(QLabel("지정 키"))
         dk = QComboBox()
         dk.addItems(list(VK))
-        dk.setCurrentText(self.cfg.get("debuff_hotkey", "F11"))
+        dk.clear()
+        dk.addItems([NO_KEY, *VK])
+        dk.setCurrentText(self.cfg.get("debuff_hotkey") or NO_KEY)
+        dk.setToolTip("단축키로도 영역 지정을 하려면 고르세요.\n주의: 고른 키는 게임에 전달되지 않습니다 (스킬 키와 겹치지 않게)")
         dk.currentTextChanged.connect(self._change_debuff_hotkey)
         opts.addWidget(dk)
         lay.addLayout(opts)
@@ -804,17 +822,38 @@ class Launcher(QMainWindow):
         self._debuffs_changed()
 
     def _change_debuff_hotkey(self, key):
+        key = None if key == NO_KEY else key
         self.cfg["debuff_hotkey"] = key
-        self.debuff_hotkey.set_key(key)
+        _apply_hotkey(self.debuff_hotkey, key)
         self._save()
 
-    def select_debuff_region(self):
-        if self.selector is not None:
+    def _open_selector(self, message, on_selected):
+        """영역 선택 화면: 실행기가 게임 화면을 가리지 않게 잠깐 내렸다가, 화면을 얼려 캡처한 뒤 고르게 한다."""
+        if self.selector is not None or getattr(self, "_selector_pending", False):
             return
-        self.selector = RegionSelector("보스를 선택한 상태에서 디버프 아이콘 줄과 그 아래 체력바까지 드래그하세요")
-        self.selector.selected.connect(self._on_debuff_region)
-        self.selector.destroyed.connect(lambda: setattr(self, "selector", None))
-        self.selector.show()
+        self._selector_pending = True
+        was_visible = self.isVisible() and not self.isMinimized()
+        if was_visible:
+            self.showMinimized()
+
+        def open_():
+            self._selector_pending = False
+            self.selector = RegionSelector(message)
+            self.selector.selected.connect(on_selected)
+
+            def done():
+                self.selector = None
+                if was_visible:
+                    self.showNormal()
+                    self.raise_()
+                    self.activateWindow()
+            self.selector.destroyed.connect(done)
+            self.selector.show()
+        QTimer.singleShot(450 if was_visible else 0, open_)     # 창이 내려가는 애니메이션이 끝난 뒤 캡처
+
+    def select_debuff_region(self):
+        self._open_selector("보스를 선택한 상태에서 디버프 아이콘 줄과 그 아래 체력바까지 드래그하세요",
+                            self._on_debuff_region)
 
     def _on_debuff_region(self, r):
         """영역만 지정 (디버프는 이미 등록돼 있음). 새 아이콘 등록은 디버프 탭의 '아이콘 등록' 버튼으로."""
@@ -935,12 +974,7 @@ class Launcher(QMainWindow):
 
     # ---------- 동작 ----------
     def select_region(self):
-        if self.selector is not None:
-            return
-        self.selector = RegionSelector()
-        self.selector.selected.connect(self._on_region)
-        self.selector.destroyed.connect(lambda: setattr(self, "selector", None))
-        self.selector.show()
+        self._open_selector("버프 목록(아이콘 + 이름 + 남은 시간)을 드래그해서 선택하세요", self._on_region)
 
     def _on_region(self, r):
         self.cfg["region"] = r
@@ -1054,15 +1088,16 @@ class Launcher(QMainWindow):
         self.pill.setStyleSheet(f"background:{bg}; color:{fg};")
 
     def _change_hotkey(self, key):
+        key = None if key == NO_KEY else key
         self.cfg["hotkey"] = key
-        self.hotkey.set_key(key)
+        _apply_hotkey(self.hotkey, key)
         self._update_hotkey_labels()
         self._save()
 
     def _update_hotkey_labels(self):
-        self.sel_btn.setText(f"영역 지정  ({self.cfg['hotkey']})")
+        self.sel_btn.setText("영역 지정" + (f"  ({self.cfg['hotkey']})" if self.cfg.get("hotkey") else ""))
         if not self.snapshot:
-            self.preview.setText(f"{self.cfg['hotkey']} 를 눌러 게임 화면의 버프 목록을 드래그하세요")
+            self.preview.setText("'영역 지정'을 눌러 게임 화면의 버프 목록을 드래그하세요")
 
     def _rename(self, key, current):
         d = RenameDialog(current, self.cfg["known_names"], self)

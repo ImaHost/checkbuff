@@ -19,7 +19,7 @@ DEFAULT_KNOWN_NAMES = [
 
 DEFAULTS = {
     "region": None,              # [x, y, w, h] 물리 픽셀 좌표
-    "hotkey": "F10",
+    "hotkey": None,              # 영역 지정 단축키 (None = 사용 안 함, 게임 키를 가로채지 않도록 기본은 끔)
     "admin_task": True,          # UAC 창 없이 관리자로 실행 (작업 스케줄러)
     "interval_ms": 500,          # 체크 주기
     "threshold_sec": 30,         # 이 시간 이하면 알림창에 표시
@@ -34,7 +34,7 @@ DEFAULTS = {
     "alert_collapsed": False,    # 알림창 이름 접기 (아이콘 + 시간만)
     # --- 디버프 ---
     "debuff_region": None,       # [x, y, w, h] 대상 체력바 위 디버프 아이콘 줄
-    "debuff_hotkey": "F11",
+    "debuff_hotkey": None,
     "debuff_enabled": True,
     "debuff_missing_sec": 1.0,   # 이 시간 이상 안 보여야 '없음' (깜빡임 대비)
     "debuff_threshold_sec": 30,  # 아이콘 아래 시간이 숫자(초)로 이 이하면 갱신 필요
@@ -99,6 +99,11 @@ def load() -> dict:
     if cfg.get("hotkey") == "F9" and not cfg.get("hotkey_migrated"):
         cfg["hotkey"] = "F10"            # F9 는 윈도우 캡처 도구와 겹침
     cfg["hotkey_migrated"] = True
+    # 전역 단축키는 그 키를 게임에 전달하지 않음(F10·F11 스킬이 막힘) → 기존 F10/F11 설정을 '사용 안 함'으로
+    if not cfg.get("hotkeys_off_migrated"):
+        cfg["hotkey"] = None
+        cfg["debuff_hotkey"] = None
+        cfg["hotkeys_off_migrated"] = True
     # 인식 기준을 바꾼 버전: 예전 설정 파일에 저장된 색 기준을 새 기본값으로 교체
     if cfg.get("vision_version", 0) < VISION_VERSION:
         for k in VISION_KEYS:
