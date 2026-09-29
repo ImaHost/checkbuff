@@ -257,6 +257,7 @@ class Launcher(QMainWindow):
         self.presence_alert.moved.connect(lambda _: self._save())
         self.presence_alert.collapse_toggled.connect(lambda _: self._save())
         self.presence_alerted = set()
+        self._presence_last = {}            # 디버프 id -> (마지막으로 읽은 남은 초, 시각)
         self.summoners = [AutoSummon(self.cfg, g) for g in GROUPS]      # 자동 투안, 자동 햄
         self.hotkey = GlobalHotkey(self.cfg.get("hotkey") or "F10")
         self.hotkey.pressed.connect(self.select_region)
@@ -924,7 +925,8 @@ class Launcher(QMainWindow):
                 st.setStyleSheet(f"color: {style.MUTED};")
             elif it.get("kind") == KIND_PRESENCE:
                 on = present[it["id"]]
-                st.setText("들어감!" if on else "없음")
+                sec = self._presence_sec(it["id"], now) if on else None
+                st.setText(("들어감!" if sec is None else f"들어감 · {self._short_time(sec)}") if on else "없음")
                 st.setStyleSheet(f"color: {style.DANGER if on else style.MUTED}; font-weight: 700;")
             elif present[it["id"]]:
                 sec = self.debuff_secs.get(it["id"])
@@ -962,7 +964,11 @@ class Launcher(QMainWindow):
 
         # 있으면 알림 (붕괴 등): 별도 알림창 + 음성으로 이름을 한 번 말함 (디버프 알림음 설정을 따름)
         occurred = [i for i in presence if active and present.get(i["id"])]
-        self.presence_alert.set_items([{"name": i["name"], "missing": True, "tag": "들어감",
+        tags = {}
+        for i in occurred:
+            sec = self._presence_sec(i["id"], now)
+            tags[i["id"]] = "들어감" if sec is None else self._short_time(sec)
+        self.presence_alert.set_items([{"name": i["name"], "missing": True, "tag": tags[i["id"]],
                                         "remaining": None, "expired": False, "pixmap": to_pixmap(i["icons"][0])}
                                        for i in occurred])
         pids = {i["id"] for i in occurred}
@@ -971,6 +977,23 @@ class Launcher(QMainWindow):
                 if i["id"] not in self.presence_alerted:
                     sound.speak(i["name"], self.cfg.get("debuff_volume", 40))
         self.presence_alerted = pids
+        for k in [k for k in self._presence_last if k not in pids]:
+            del self._presence_last[k]
+
+    def _presence_sec(self, did, now):
+        """'있으면 알림' 디버프(붕괴 등) 아이콘 아래 남은 시간. 한 번 못 읽으면 직전 값에서 흐른 시간만큼 빼서 잠시 유지."""
+        sec = self.debuff_secs.get(did)
+        if sec is not None:
+            self._presence_last[did] = (sec, now)
+            return sec
+        last = self._presence_last.get(did)
+        if last and now - last[1] <= 3.0:
+            return max(0, int(last[0] - (now - last[1])))
+        return None
+
+    @staticmethod
+    def _short_time(sec):
+        return f"{sec}초" if sec < 60 else (f"{sec // 60}분" if sec < 3600 else f"{sec // 3600}시간")
 
     # ---------- 동작 ----------
     def select_region(self):
